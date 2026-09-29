@@ -3,6 +3,7 @@
     /* Language & runtime */
     "target": "ES2022",
     "lib": ["ES2022"],
+    "types": ["node"],
 
     /* Node ESM */
     "module": "ES2022",

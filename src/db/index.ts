@@ -1,4 +1,4 @@
-/*import 'dotenv/config';
+import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import {defineConfig} from 'drizzle-kit';
@@ -17,4 +17,4 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
-}); */
+});
