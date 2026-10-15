@@ -6,8 +6,8 @@
     "types": ["node"],
 
     /* Node ESM */
-    "module": "ES2022",
-    "moduleResolution": "node",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
 
     /* Project structure */
     "rootDir": "src",
