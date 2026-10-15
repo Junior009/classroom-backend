@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import aj from '../config/arcjet';
+import aj from '../config/arcjet.js';
 import { slidingWindow } from '@arcjet/node';
 import { Socket } from 'node:dgram';
 

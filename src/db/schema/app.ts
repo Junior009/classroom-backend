@@ -1,6 +1,6 @@
 import {integer, pgEnum, pgTable, text, timestamp, varchar, jsonb, index, uniqueIndex} from "drizzle-orm/pg-core";
 import {relations} from "drizzle-orm";
-import {user} from "./auth";
+import {user} from "./auth.js";
 
 const timestamps = {
     createdAt: timestamp('created_at').defaultNow().notNull(),
