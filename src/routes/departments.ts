@@ -40,4 +40,49 @@ router.get("/", async (req, res) => {
     }
 });
 
+/*router.get('/:id', async (req, res) => {
+    const classId = Number(req.params.id);
+
+    if(!Number.isFinite(classId)) return res.status(400).json({ error: 'No Class found.' });
+
+    const [classDetails] = await db
+        .select({
+            ...getTableColumns(classes),
+            subject: {
+                ...getTableColumns(subjects),
+            },
+            department: {
+                ...getTableColumns(departments),
+            },
+            teacher: {
+                ...getTableColumns(user),
+            }
+        })
+        .from(classes)
+        .leftJoin(subjects, eq(classes.subjectId, subjects.id))
+        .leftJoin(user, eq(classes.teacherId, user.id))
+        .leftJoin(departments, eq(subjects.departmentId, departments.id))
+        .where(eq(classes.id, classId))
+
+    if(!classDetails) return res.status(404).json({ error: 'No Class found.' });
+
+    res.status(200).json({ data: classDetails });
+}) */
+
+router.post('/', async (req, res) => {
+    try {
+        const [createdDepartment] = await db
+            .insert(departments)
+            .values({...req.body})
+            .returning({ id: departments.id });
+
+        if(!createdDepartment) throw Error;
+
+        res.status(201).json({ data: createdDepartment });
+    } catch (e) {
+        console.error(`POST / Department error ${e}`);
+        res.status(500).json({ error: e})
+    }
+})
+
 export default router;
