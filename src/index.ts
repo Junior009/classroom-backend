@@ -5,6 +5,7 @@ AgentAPI.config();
 import express from 'express';
 import cors from 'cors';
 import subjectsRouter from './routes/subjects.js';
+import departmentsRouter from './routes/departments.js';
 import usersRouter from './routes/users.js';
 import classesRouter from './routes/classes.js'
 import securityMiddleware from './middleware/security.js';
@@ -30,6 +31,7 @@ app.use(express.json());
 app.use(securityMiddleware);
 
 app.use('/api/subjects', subjectsRouter);
+app.use('/api/departments', departmentsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/classes', classesRouter);
 
