@@ -5,6 +5,22 @@ import { db } from "../db/index.js";
 
 const router = express.Router();
 
+router.post("/", async(req, res) => {
+       try{
+        const [createSubjects] = await db
+            .insert(subjects)
+            .values({...req.body})
+            .returning({ id: subjects.id });
+
+        if(!createSubjects) throw Error;
+
+        res.status(201).json({ data: createSubjects });
+    } catch (e) {
+        console.error(`POST /subjects error ${e}`);
+        res.status(500).json({ error: e})
+    }
+})
+
 router.get("/", async (req, res) => {
     try {
         const {search, department, page = 1, limit = 10} = req.query;
