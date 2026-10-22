@@ -1,5 +1,5 @@
 import express from "express";
-import { asc, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { departments } from "../db/schema/index.js";
 import { db } from "../db/index.js";
 
@@ -37,6 +37,26 @@ router.get("/", async (req, res) => {
     } catch (error) {
         console.error("GET /departments/Error fetching departments:", error);
         res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+router.get('/:id', async (req, res) => {
+    const departmentId = Number(req.params.id);
+    if (!Number.isInteger(departmentId) || departmentId < 1) {
+        return res.status(400).json({ error: 'Invalid department ID.' });
+    }
+
+    try {
+        const [department] = await db
+            .select()
+            .from(departments)
+            .where(eq(departments.id, departmentId));
+
+        if (!department) return res.status(404).json({ error: 'Department not found.' });
+        return res.status(200).json({ data: department });
+    } catch (error) {
+        console.error(`GET /departments/${departmentId} error:`, error);
+        return res.status(500).json({ error: 'Failed to get department.' });
     }
 });
 
@@ -84,5 +104,65 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: e})
     }
 })
+
+const updateDepartment = async (req: express.Request, res: express.Response) => {
+    const departmentId = Number(req.params.id);
+    if (!Number.isInteger(departmentId) || departmentId < 1) {
+        return res.status(400).json({ error: 'Invalid department ID.' });
+    }
+
+    const body = req.body as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+    for (const field of ['name', 'code', 'description']) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) updates[field] = body[field];
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No editable fields provided.' });
+    }
+
+    try {
+        const [updatedDepartment] = await db
+            .update(departments)
+            .set(updates)
+            .where(eq(departments.id, departmentId))
+            .returning();
+
+        if (!updatedDepartment) return res.status(404).json({ error: 'Department not found.' });
+        return res.status(200).json({ data: updatedDepartment });
+    } catch (error) {
+        const code = (error as { cause?: { code?: string }; code?: string })?.cause?.code
+            ?? (error as { code?: string })?.code;
+        console.error(`PUT /departments/${departmentId} error:`, error);
+        if (code === '23505') return res.status(409).json({ error: 'A department with this code already exists.' });
+        return res.status(500).json({ error: 'Failed to update department.' });
+    }
+};
+
+router.put('/:id', updateDepartment);
+router.patch('/:id', updateDepartment);
+
+router.delete('/:id', async (req, res) => {
+    const departmentId = Number(req.params.id);
+    if (!Number.isInteger(departmentId) || departmentId < 1) {
+        return res.status(400).json({ error: 'Invalid department ID.' });
+    }
+
+    try {
+        const [deletedDepartment] = await db
+            .delete(departments)
+            .where(eq(departments.id, departmentId))
+            .returning({ id: departments.id });
+
+        if (!deletedDepartment) return res.status(404).json({ error: 'Department not found.' });
+        return res.status(200).json({ data: deletedDepartment });
+    } catch (error) {
+        const code = (error as { cause?: { code?: string }; code?: string })?.cause?.code
+            ?? (error as { code?: string })?.code;
+        console.error(`DELETE /departments/${departmentId} error:`, error);
+        if (code === '23503') return res.status(409).json({ error: 'This department contains subjects and cannot be deleted.' });
+        return res.status(500).json({ error: 'Failed to delete department.' });
+    }
+});
 
 export default router;

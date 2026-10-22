@@ -87,30 +87,29 @@ router.get("/", async (req, res) => {
 router.get('/:id', async (req, res) => {
     const classId = Number(req.params.id);
 
-    if(!Number.isFinite(classId)) return res.status(400).json({ error: 'No Class found.' });
+    if(!Number.isInteger(classId) || classId < 1) return res.status(400).json({ error: 'Invalid class ID.' });
 
-    const [classDetails] = await db
-        .select({
-            ...getTableColumns(classes),
-            subject: {
-                ...getTableColumns(subjects),
-            },
-            department: {
-                ...getTableColumns(departments),
-            },
-            teacher: {
-                ...getTableColumns(user),
-            }
-        })
-        .from(classes)
-        .leftJoin(subjects, eq(classes.subjectId, subjects.id))
-        .leftJoin(user, eq(classes.teacherId, user.id))
-        .leftJoin(departments, eq(subjects.departmentId, departments.id))
-        .where(eq(classes.id, classId))
+    try {
+        const [classDetails] = await db
+            .select({
+                ...getTableColumns(classes),
+                subject: { ...getTableColumns(subjects) },
+                department: { ...getTableColumns(departments) },
+                teacher: { ...getTableColumns(user) }
+            })
+            .from(classes)
+            .leftJoin(subjects, eq(classes.subjectId, subjects.id))
+            .leftJoin(user, eq(classes.teacherId, user.id))
+            .leftJoin(departments, eq(subjects.departmentId, departments.id))
+            .where(eq(classes.id, classId));
 
-    if(!classDetails) return res.status(404).json({ error: 'No Class found.' });
+        if(!classDetails) return res.status(404).json({ error: 'Class not found.' });
 
-    res.status(200).json({ data: classDetails });
+        res.status(200).json({ data: classDetails });
+    } catch (error) {
+        console.error(`GET /classes/${classId} error:`, error);
+        res.status(500).json({ error: 'Failed to get class' });
+    }
 })
 
 router.post('/', async (req, res) => {
@@ -128,5 +127,68 @@ router.post('/', async (req, res) => {
         res.status(500).json({ error: e})
     }
 })
+
+const updateClass = async (req: express.Request, res: express.Response) => {
+    const classId = Number(req.params.id);
+    if (!Number.isInteger(classId) || classId < 1) {
+        return res.status(400).json({ error: 'Invalid class ID.' });
+    }
+
+    const body = req.body as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+    const editableFields = [
+        'subjectId', 'teacherId', 'name', 'bannerCldPubId', 'bannerUrl',
+        'description', 'capacity', 'status', 'schedules'
+    ];
+
+    for (const field of editableFields) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) updates[field] = body[field];
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No editable fields provided.' });
+    }
+
+    try {
+        const [updatedClass] = await db
+            .update(classes)
+            .set(updates)
+            .where(eq(classes.id, classId))
+            .returning();
+
+        if (!updatedClass) return res.status(404).json({ error: 'Class not found.' });
+        return res.status(200).json({ data: updatedClass });
+    } catch (error) {
+        const code = (error as { cause?: { code?: string }; code?: string })?.cause?.code
+            ?? (error as { code?: string })?.code;
+        console.error(`PUT /classes/${classId} error:`, error);
+        if (code === '23503') return res.status(409).json({ error: 'A referenced subject or teacher does not exist.' });
+        if (code === '23505') return res.status(409).json({ error: 'The class invite code is already in use.' });
+        return res.status(500).json({ error: 'Failed to update class.' });
+    }
+};
+
+router.put('/:id', updateClass);
+router.patch('/:id', updateClass);
+
+router.delete('/:id', async (req, res) => {
+    const classId = Number(req.params.id);
+    if (!Number.isInteger(classId) || classId < 1) {
+        return res.status(400).json({ error: 'Invalid class ID.' });
+    }
+
+    try {
+        const [deletedClass] = await db
+            .delete(classes)
+            .where(eq(classes.id, classId))
+            .returning({ id: classes.id });
+
+        if (!deletedClass) return res.status(404).json({ error: 'Class not found.' });
+        return res.status(200).json({ data: deletedClass });
+    } catch (error) {
+        console.error(`DELETE /classes/${classId} error:`, error);
+        return res.status(500).json({ error: 'Failed to delete class.' });
+    }
+});
 
 export default router;
