@@ -17,6 +17,12 @@ import {auth} from "./lib/auth.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+const trustedProxyCidrs = (process.env.TRUSTED_PROXY_CIDRS ?? "")
+  .split(",")
+  .map((cidr) => cidr.trim())
+  .filter(Boolean);
+
+app.set("trust proxy", trustedProxyCidrs);
 
 if (!process.env.FRONTEND_URL) {
   throw new Error('FRONTEND_URL is not defined in .env file');
@@ -28,7 +34,13 @@ app.use(cors({
   credentials: true
 }));
 
-app.all('/api/auth/{*splat}', toNodeHandler(auth));
+const forwardResolvedClientIp: express.RequestHandler = (req, _res, next) => {
+  const clientIp = req.ip || req.socket.remoteAddress;
+  if (clientIp) req.headers["x-forwarded-for"] = clientIp;
+  next();
+};
+
+app.all('/api/auth/{*splat}', forwardResolvedClientIp, toNodeHandler(auth));
 
 app.use(express.json());
 app.use(sessionMiddleware);
