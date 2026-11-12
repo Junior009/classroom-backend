@@ -4,13 +4,15 @@ import {and, desc, eq, getTableColumns, ilike, or, sql} from "drizzle-orm";
 import {db} from "../db/index.js";
 import {classes, departments, subjects} from '../db/schema/app.js'
 import { user } from '../db/schema/auth.js'
+import { requireRole } from "../middleware/authorize.js";
 
 const router = express.Router();
 
 // Get all classes with optional search, filtering and pagination
-router.get("/", async (req, res) => {
+router.get("/", requireRole("admin", "teacher"), async (req, res) => {
     try {
-        const { search, subject, teacher, page = 1, limit = 10 } = req.query;
+        const { search, subject, teacher, teacherId, page = 1, limit = 10 } = req.query;
+        const effectiveTeacherId = req.user?.role === "teacher" ? req.user.id : teacherId;
 
         const currentPage = Math.max(1, parseInt(String(page), 10) || 1);
         const limitPerPage = Math.min(Math.max(1, parseInt(String(limit), 10) || 10), 100); // Max 100 records per page
@@ -39,6 +41,10 @@ router.get("/", async (req, res) => {
         if (teacher) {
             const teacherPattern = `%${String(teacher).replace(/[%_]/g, '\\$&')}%`;
             filterConditions.push(ilike(user.name, teacherPattern));
+        }
+
+        if (effectiveTeacherId) {
+            filterConditions.push(eq(classes.teacherId, String(effectiveTeacherId)));
         }
 
         // Combine all filters using AND if any exist
@@ -84,7 +90,7 @@ router.get("/", async (req, res) => {
 })
 
 // Get class details with teacher, subject, and department
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireRole("admin", "teacher"), async (req, res) => {
     const classId = Number(req.params.id);
 
     if(!Number.isInteger(classId) || classId < 1) return res.status(400).json({ error: 'Invalid class ID.' });
@@ -101,7 +107,10 @@ router.get('/:id', async (req, res) => {
             .leftJoin(subjects, eq(classes.subjectId, subjects.id))
             .leftJoin(user, eq(classes.teacherId, user.id))
             .leftJoin(departments, eq(subjects.departmentId, departments.id))
-            .where(eq(classes.id, classId));
+            .where(and(
+                eq(classes.id, classId),
+                req.user?.role === "teacher" ? eq(classes.teacherId, req.user.id) : undefined,
+            ));
 
         if(!classDetails) return res.status(404).json({ error: 'Class not found.' });
 
@@ -112,7 +121,7 @@ router.get('/:id', async (req, res) => {
     }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', requireRole("admin"), async (req, res) => {
     try {
         const [createdClass] = await db
             .insert(classes)
@@ -168,10 +177,10 @@ const updateClass = async (req: express.Request, res: express.Response) => {
     }
 };
 
-router.put('/:id', updateClass);
-router.patch('/:id', updateClass);
+router.put('/:id', requireRole("admin"), updateClass);
+router.patch('/:id', requireRole("admin"), updateClass);
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole("admin"), async (req, res) => {
     const classId = Number(req.params.id);
     if (!Number.isInteger(classId) || classId < 1) {
         return res.status(400).json({ error: 'Invalid class ID.' });

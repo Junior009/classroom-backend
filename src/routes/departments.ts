@@ -2,8 +2,10 @@ import express from "express";
 import { asc, eq, sql } from "drizzle-orm";
 import { departments } from "../db/schema/index.js";
 import { db } from "../db/index.js";
+import { requireRole } from "../middleware/authorize.js";
 
 const router = express.Router();
+router.use(requireRole("admin"));
 
 router.get("/", async (req, res) => {
     try {

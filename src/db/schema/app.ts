@@ -1,4 +1,4 @@
-import {integer, pgEnum, pgTable, text, timestamp, varchar, jsonb, index, uniqueIndex} from "drizzle-orm/pg-core";
+import {integer, pgEnum, pgTable, text, timestamp, varchar, jsonb, index, uniqueIndex, date, real} from "drizzle-orm/pg-core";
 import {relations} from "drizzle-orm";
 import {user} from "./auth.js";
 
@@ -56,6 +56,40 @@ export const enrollments = pgTable("enrollments", {
   index("enrollments_class_id_idx").on(table.classId)
 ]);
 
+export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent", "late", "excused"]);
+
+export const attendanceRecords = pgTable("attendance_records", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  classId: integer("class_id").notNull().references(() => classes.id, {onDelete: "cascade"}),
+  studentId: text("student_id").notNull().references(() => user.id, {onDelete: "cascade"}),
+  attendanceDate: date("attendance_date", {mode: "string"}).notNull(),
+  status: attendanceStatusEnum("status").notNull(),
+  note: text("note"),
+  markedBy: text("marked_by").references(() => user.id, {onDelete: "set null"}),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("attendance_class_student_date_unique").on(table.classId, table.studentId, table.attendanceDate),
+  index("attendance_class_date_idx").on(table.classId, table.attendanceDate),
+  index("attendance_student_id_idx").on(table.studentId),
+]);
+
+export const grades = pgTable("grades", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  classId: integer("class_id").notNull().references(() => classes.id, {onDelete: "cascade"}),
+  studentId: text("student_id").notNull().references(() => user.id, {onDelete: "cascade"}),
+  assessmentName: varchar("assessment_name", {length: 255}).notNull(),
+  score: real("score").notNull(),
+  maxScore: real("max_score").notNull(),
+  assessmentDate: date("assessment_date", {mode: "string"}).notNull(),
+  feedback: text("feedback"),
+  gradedBy: text("graded_by").references(() => user.id, {onDelete: "set null"}),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("grades_class_student_assessment_unique").on(table.classId, table.studentId, table.assessmentName),
+  index("grades_class_id_idx").on(table.classId),
+  index("grades_student_id_idx").on(table.studentId),
+]);
+
 export const departmentRelations = relations(departments, ({many}) => ({
   subjects: many(subjects)
 }));
@@ -77,7 +111,9 @@ export const classesRelations = relations(classes, ({one, many}) => ({
     fields: [classes.teacherId],
     references: [user.id]
   }),
-  enrollments: many(enrollments)
+  enrollments: many(enrollments),
+  attendanceRecords: many(attendanceRecords),
+  grades: many(grades),
 }));
 
 export const enrollmentsRelations = relations(enrollments, ({one}) => ({
@@ -101,3 +137,7 @@ export type Class = typeof classes.$inferSelect;
 export type NewClass = typeof classes.$inferInsert;
 export type Enrollment = typeof enrollments.$inferSelect;
 export type NewEnrollment = typeof enrollments.$inferInsert;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+export type NewAttendanceRecord = typeof attendanceRecords.$inferInsert;
+export type Grade = typeof grades.$inferSelect;
+export type NewGrade = typeof grades.$inferInsert;

@@ -15,6 +15,13 @@
       "when": 1791899226176,
       "tag": "0001_slow_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794451337005,
+      "tag": "0002_lumpy_smasher",
+      "breakpoints": true
     }
   ]
 }
